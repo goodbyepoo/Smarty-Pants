@@ -2,6 +2,7 @@ from keep_alive import keep_alive
 import random
 import time
 import discord
+import discord.ext
 from discord.ext import commands
 import os
 import datetime;
@@ -28,48 +29,76 @@ def createImages():
 with open("images.txt", "r") as fp:
 	images = json.load(fp)
 
-@bot.command(guild_ids=[guild], name="list", description = "Return the list of images")
-async def list(ctx):
+bannedusers = []
+with open("banned_users.txt", "r") as fp:
+	bannedusers = json.load(fp)
+
+
+#Commands
+@bot.command(guild_ids=[guild], name="listimages", description = "Returns the list of images")
+async def listimages(ctx):
 	await ctx.respond(images)
-	
+@bot.command(guild_ids=[guild], name="listbannedusers", description = "Returns the list of images")
+async def listbannedusers(ctx):
+	await ctx.respond(bannedusers)
 @bot.command(name = "ping", description="Sends the bot's latency.")
 async def ping(ctx): 
     await ctx.respond(f"Pong! Latency is {bot.latency}")
 
-@bot.command(name="pop", guild_ids=[guild], description = "Remove an image from the list")
-async def pop(ctx, index: int):
+@bot.command(name="pop", guild_ids=[guild], description = "Removes an image from the list")
+async def pop(ctx, index: discord.Option(discord.SlashCommandOptionType.string)):
 	images.pop(index)
 	with open("images.txt", "w") as fp:
 		json.dump(images, fp)
 	await bot.get_channel(1076660535573098536).send(images)
 	await ctx.respond(index + " popped!")
 
-
-	
-
-@bot.slash_command(name="append", guild_ids=[guild], description = "Add an image to the list")
+@bot.slash_command(name="append", guild_ids=[guild], description = "Adds an image to the list")
 async def append(ctx, url: discord.Option(discord.SlashCommandOptionType.string)):
-	images.append(url)
-	channel = client.get_channel(1076660535573098536)
-	with open("images.txt", "w") as fp:
-		json.dump(images, fp)
-	await bot.get_channel(1076660535573098536).send(images)
-	await ctx.respond(url + " appended!")
+	if url not in images:
+		images.append(url)
+		with open("images.txt", "w") as fp:
+			json.dump(images, fp)
+		await bot.get_channel(1076660535573098536).send(images)
+		await ctx.respond(url + " appended!")
+	else:
+		await ctx.respond(url + " is already in the list!")
 
-
-@bot.slash_command(name="report", description = "Report a problem such as a broken image") 
+@bot.slash_command(name="report", description = "Reports a problem such as a broken image") 
 async def report(ctx, report: discord.Option(discord.SlashCommandOptionType.string)):
-	channel = client.get_channel(1076660535573098536)
-	x = str(f"{ctx.author}\nReport: " + report)
-	await bot.get_channel(1076660535573098536).send(f"{ctx.author}" + '\n' + "Report: " + report)
-	await ctx.respond("Problem reported!")
+	if int(f"{ctx.user.id}") not in bannedusers:
+		await bot.get_channel(1076660535573098536).send(f"{ctx.author} | {ctx.user.id}" + '\n' + "Report: " + report)
+		await ctx.respond("Problem reported!")
+	else:
+		await ctx.respond("lol youre banned from making reports :))))!")
+@bot.slash_command(name = "suggest", description = "Suggests an image to be added to the list")
+async def suggest(ctx, url: discord.Option(discord.SlashCommandOptionType.string)):
+	if (url not in images):
+		if (int(f"{ctx.user.id}") not in bannedusers):
+			await bot.get_channel(1076652437991067729).send(f"{ctx.author} | {ctx.user.id}" + '\n' + "Suggestion: " + url)
+			await ctx.respond("Image suggested!")
+		else:
+			await ctx.respond("lol youre banned from suggesting images")
+	else:
+		await ctx.respond("Image has already been added!")
+@bot.slash_command(name="ban", description = "Bans a user from making reports", guild_ids = [guild])
+async def ban(ctx, user: discord.Option(discord.SlashCommandOptionType.string)):
+	bannedusers.append(user)
+	with open("banned_users.txt", "w") as fp:
+		json.dump(bannedusers, fp)
+	await ctx.respond(user + " banned!")
 
+@bot.slash_command(name="unban", description = "Bans a user from making reports", guild_ids = [guild])
+async def unban(ctx, user: discord.Option(discord.SlashCommandOptionType.string)):
+	bannedusers.pop(bannedusers.index(user))
+	with open("banned_users.txt", "w") as fp:
+		json.dump(bannedusers, fp)
+	await ctx.respond(user + " unbanned!")
 
-@bot.slash_command(name="image", description = "Generate a random image") 
+@bot.slash_command(name="image", description = "Generates a random image") 
 async def image(ctx):
 	c = random.choice(images)
 	await ctx.respond(c)
-	channel = client.get_channel(1076660535573098536)
 	x = datetime.datetime.now()
 	strang = x.strftime("%c") + ": " + c
 	await bot.get_channel(1076660535573098536).send(strang)
